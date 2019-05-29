@@ -13,7 +13,7 @@
 `define BNE  6'h5
 `define HALT 6'h11 /* this is not for MIPS */
 /******************************************************************************/
-/*
+
 module m_top ();
   reg r_clk=0; initial forever #50 r_clk = ~r_clk;
   reg r_rst=0;
@@ -31,7 +31,7 @@ module m_top ();
            p.MeWb_rd2, p.w_rslt2);
   end
 endmodule
-*/
+
 /******************************************************************************/
 module m_main (w_clk, w_btnu, w_btnd, w_led, r_sg, r_an);
   input  wire w_clk, w_btnu, w_btnd;
@@ -39,8 +39,8 @@ module m_main (w_clk, w_btnu, w_btnd, w_led, r_sg, r_an);
   output reg [6:0] r_sg;  // cathode segments
   output reg [7:0] r_an;  // common anode
 
-  wire w_clk2, w_locked;
-  clk_wiz_0 clk_wiz (w_clk2, 0, w_locked, w_clk);
+  wire w_clk2 = w_clk, w_locked =1;
+  //clk_wiz_0 clk_wiz (w_clk2, 0, w_locked, w_clk);
 
   wire w_rst = ~w_locked;
   wire [31:0] w_rout;
