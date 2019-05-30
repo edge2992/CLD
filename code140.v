@@ -118,11 +118,12 @@ module m_proc11 (w_clk, w_rst, r_rout, r_halt);
   end
   /**************************** EX stage ***********************************/
   //mux for data hazard
-  wire [31:0] w_plus1, w_plus2;
+  wire [31:0] w_plus1, w_plus2_1, w_plus2_2;
   assign w_plus1 = ((IdEx_rs == ExMe_rd2) && (ExMe_rd2 != 0)) ? ExMe_rslt : ((IdEx_rs == MeWb_rd2)&&(MeWb_rd2 != 0)) ? w_rslt2 : IdEx_rrs;//mux
-  assign w_plus2 = ((IdEx_rt == ExMe_rd2) && (ExMe_rd2 != 0)&&(ExMe_op ==0)) ? ExMe_rslt : ((IdEx_rt == MeWb_rd2)&&(MeWb_rd2 != 0)&&(MeWb_op ==0)) ? w_rslt2 : IdEx_rrt;//mux
+  assign w_plus2_1 = ((IdEx_rt == ExMe_rd2) && (ExMe_rd2 != 0)&&(ExMe_op ==0)) ? ExMe_rslt : ((IdEx_rt == MeWb_rd2)&&(MeWb_rd2 != 0)&&(MeWb_op ==0)) ? w_rslt2 : IdEx_rrt;//mux
+  assign w_plus2_2 = (IdEx_op > 6'h5) ? IdEx_rrt2 : w_plus2_1;
   //wire [31:0] #10 w_rslt = IdEx_rrs + IdEx_rrt2; // ALU
-  wire [31:0] #10 w_rslt = w_plus1 + w_plus2; // ALU origin
+  wire [31:0] #10 w_rslt = w_plus1 + w_plus2_2; // ALU origin
 
   always @(posedge w_clk) begin
     ExMe_pc   <= #3 IdEx_pc;
@@ -133,6 +134,7 @@ module m_proc11 (w_clk, w_rst, r_rout, r_halt);
     ExMe_rslt <= #3 w_rslt;
     ExMe_rrt  <= #3 IdEx_rrt;
   end
+  
   /**************************** MEM stage **********************************/
   m_memory m_dmem (w_clk, ExMe_rslt[13:2], ExMe_we, ExMe_rrt, MeWb_ldd);
   always @(posedge w_clk) begin
