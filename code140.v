@@ -113,9 +113,24 @@ module m_proc11 (w_clk, w_rst, r_rout, r_halt);
   /**************************** EX stage ***********************************/
   //mux for data hazard
   wire [31:0] w_plus1, w_plus2_1,w_plus2_2;
-  assign w_plus1 = ((IdEx_rs == ExMe_rd2) && (ExMe_rd2 != 0)) ? ExMe_rslt : ((IdEx_rs == MeWb_rd2)&&(MeWb_rd2 != 0)) ? w_rslt2 : IdEx_rrs;//mux
-  assign w_plus2_1 = ((IdEx_rt == ExMe_rd2) && (ExMe_rd2 != 0)) ? ExMe_rslt : ((IdEx_rt == MeWb_rd2)&&(MeWb_rd2 != 0)) ? w_rslt2 : IdEx_rrt2;//mux
+  assign w_plus1 = (ExMe_w && (IdEx_rs == ExMe_rd2) && (ExMe_rd2 != 0)) ? ExMe_rslt : 
+  (MeWb_w
+  && (MeWb_rd2 != 0)
+  && !(ExMe_w && (ExMe_rd2 != 0) && (ExMe_rd2 != IdEx_rs)) 
+  && (MeWb_rd2 == IdEx_rs))
+  ? w_rslt2 : IdEx_rrt2;//mux
+
+  assign w_plus2_1 = (ExMe_w && (IdEx_rt == ExMe_rd2) && (ExMe_rd2 != 0)) ? ExMe_rslt : 
+  (MeWb_w 
+  && (MeWb_rd2 != 0)
+  && !(ExMe_w && (ExMe_rd2 != 0) && (ExMe_rd2 != IdEx_rt))
+  && (IdEx_rt == MeWb_rd2)) 
+  ? w_rslt2 : IdEx_rrt2;//mux
+
+
+
   assign w_plus2_2 = (w_op > 6'h5) ? IdEx_rrt2 : w_plus2_1;
+
   //wire [31:0] #10 w_rslt = IdEx_rrs + IdEx_rrt2; // ALU
   wire [31:0] #10 w_rslt = w_plus1 + w_plus2_2; // ALU origin
 
@@ -126,7 +141,7 @@ module m_proc11 (w_clk, w_rst, r_rout, r_halt);
     ExMe_w    <= #3 IdEx_w;
     ExMe_we   <= #3 IdEx_we;
     ExMe_rslt <= #3 w_rslt;
-    ExMe_rrt  <= #3 IdEx_rrt;
+    //ExMe_rrt  <= #3 IdEx_rrt;
     ExMe_rrt  <= #3 w_plus2_1;
   end
   /**************************** MEM stage **********************************/
