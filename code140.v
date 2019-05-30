@@ -26,9 +26,9 @@ module m_top ();
   reg [31:0] r_cnt = 0;
   always@(posedge r_clk) r_cnt <= r_cnt + 1;
   always@(posedge r_clk) begin #90
-    $write("%8d : %x %x[%x] %x %x %x | MeWb_rd2 %d %x | ExMe_rd2 %d [IdExrs %d IdExrt %d]|ExMe_rslt %d MeWb_rslt %d\n",
+    $write("%8d : %x %x[%x] %x %x %x | MeWb_rd2[sw %d] %d %x | ExMe_rd2 %d [IdExrs %d IdExrt %d]|[plus1 %d plus2 %d]ExMe_rslt %d MeWb_rslt %d\n",
            r_cnt, p.r_pc, p.IfId_pc, p.w_op, p.IdEx_pc, p.ExMe_pc, p.MeWb_pc,
-           p.MeWb_rd2, p.w_rslt2, p.ExMe_rd2, p.IdEx_rs, p.IdEx_rt,p.ExMe_rslt, p.MeWb_rslt);
+           p.MeWb_rd2,p.MeWb_w, p.w_rslt2, p.ExMe_rd2, p.IdEx_rs, p.IdEx_rt,p.w_plus1, p.w_plus2,p.ExMe_rslt, p.MeWb_rslt);
   end
 endmodule
 
@@ -119,7 +119,7 @@ module m_proc11 (w_clk, w_rst, r_rout, r_halt);
   //mux for data hazard
   wire [31:0] w_plus1, w_plus2;
   assign w_plus1 = ((IdEx_rs == ExMe_rd2) && (ExMe_rd2 != 0)) ? ExMe_rslt : ((IdEx_rs == MeWb_rd2)&&(MeWb_rd2 != 0)) ? w_rslt2 : IdEx_rrs;//mux
-  assign w_plus2 = ((IdEx_rt == ExMe_rd2) && (ExMe_rd2 != 0)&&(ExMe_op ==0)) ? ExMe_rslt : ((IdEx_rt == MeWb_rd2)&&(MeWb_rd2 != 0)&&(MeWb_op ==0)) ? w_rslt2 : IdEx_rrt2;//mux
+  assign w_plus2 = ((IdEx_rt == ExMe_rd2) && (ExMe_rd2 != 0)) ? ExMe_rslt : ((IdEx_rt == MeWb_rd2)&&(MeWb_rd2 != 0)) ? w_rslt2 : IdEx_rrt2;//mux
   //wire [31:0] #10 w_rslt = IdEx_rrs + IdEx_rrt2; // ALU
   wire [31:0] #10 w_rslt = w_plus1 + w_plus2; // ALU origin
 
@@ -168,18 +168,21 @@ module m_memory (w_clk, w_addr, w_we, w_din, r_dout);
   initial begin
     cm_ram[0] ={`NOP};                            //     nop
     cm_ram[1] ={`ADDI, 5'd0, 5'd1, 16'h20};       //     addi $1,  $0, 0x20
-    cm_ram[2] ={`ADDI, 5'd0, 5'd10,16'd1};        //     addi $10, $0, 1
+    //cm_ram[2] ={`ADDI, 5'd0, 5'd10,16'd1};        //     addi $10, $0, 1
+    cm_ram[2] ={`SW,   5'd0, 5'd1, 16'd0};        //     sw   $1, 0($0)
     cm_ram[3] ={`ADDI, 5'd0, 5'd11,16'd2};        //     addi $11, $0, 2
     cm_ram[4] ={`ADDI, 5'd0, 5'd12,16'd3};        //     addi $12, $0, 3
     cm_ram[5] ={`ADDI, 5'd0, 5'd13,16'd4};        //     addi $13, $0, 4
-    cm_ram[6] ={`ADDI, 5'd10,5'd10,16'h10};       //     addi $10, $10,0x10
+    cm_ram[6] ={`ADDI, 5'd1,5'd10,16'h10};       //     addi $10, $1,0x10
     cm_ram[7] ={`ADDI, 5'd11,5'd11,16'h10};       //     addi $11, $11,0x10
-    cm_ram[8] ={`ADDI, 5'd12,5'd12,16'h10};       //     addi $12, $12,0x10
+    cm_ram[8] ={`ADD,  5'd10,5'd11,5'd12,11'h20}; //     add  $12,$10,$11
+    //cm_ram[8] ={`ADDI, 5'd12,5'd12,16'h10};       //     addi $12, $12,0x10
     cm_ram[9] ={`ADDI, 5'd13,5'd13,16'h10};       //     addi $13, $13,0x10
     cm_ram[10]={`ADD,  5'd10,5'd1, 5'd10,11'h20}; //     add  $10,$10,$1
     cm_ram[11]={`ADD,  5'd11,5'd1, 5'd11,11'h20}; //     add  $11,$11,$1
     cm_ram[12]={`ADD,  5'd12,5'd1, 5'd12,11'h20}; //     add  $12,$12,$1
-    cm_ram[13]={`ADD,  5'd13,5'd1, 5'd13,11'h20}; //     add  $13,$13,$1
+    //cm_ram[13]={`ADD,  5'd13,5'd1, 5'd13,11'h20}; //     add  $13,$13,$1
+    cm_ram[13] ={`LW,   5'd0, 5'd12, 16'd0};       //     lw   $12, 0($0)
     cm_ram[14]={`HALT, 26'h0};                    //     halt
     cm_ram[15]={`NOP};                            //     nop
     cm_ram[16]={`NOP};                            //     nop
