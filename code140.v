@@ -33,6 +33,7 @@ module m_top ();
 endmodule
 
 /******************************************************************************/
+/*
 module m_main (w_clk, w_btnu, w_btnd, w_led, r_sg, r_an);
   input  wire w_clk, w_btnu, w_btnd;
   output wire [15:0] w_led;
@@ -59,7 +60,7 @@ module m_main (w_clk, w_btnu, w_btnd, w_led, r_sg, r_an);
   always @(posedge w_clk2) r_sg <= w_sg;
   always @(posedge w_clk2) r_an <= w_an;
 endmodule
-
+*/
 /******************************************************************************/
 module m_proc11 (w_clk, w_rst, r_rout, r_halt);
   input  wire w_clk, w_rst;
@@ -68,6 +69,7 @@ module m_proc11 (w_clk, w_rst, r_rout, r_halt);
 
   reg  [31:0] IfId_pc4=0;                                    // pipe regs
   reg  [31:0] IdEx_rrs=0, IdEx_rrt=0, IdEx_rrt2=0;           //
+  reg   [5:0] IdEx_rs=0, IdEx_rt=0;                          //plus alpha for mux
   reg  [31:0] ExMe_rslt=0, ExMe_rrt=0;                       //
   reg  [31:0] MeWb_rslt=0;                                   //
   reg   [5:0]             IdEx_op=0,  ExMe_op=0,  MeWb_op=0; //
@@ -98,7 +100,7 @@ module m_proc11 (w_clk, w_rst, r_rout, r_halt);
   wire [31:0] w_imm32 = {{16{w_imm[15]}}, w_imm};
   wire [31:0] w_rrt2  = (w_op>6'h5) ? w_imm32 : w_rrt;
   assign      w_tpc   = IfId_pc4 + {w_imm32[29:0], 2'h0};
-  assign      w_taken = (w_op==`BNE && w_rrs!=w_rrt);
+  assign      w_taken = (w_op==`BNE && w_rrs!=w_rrt) ||(w_op==`BEQ && w_rrs==w_rrt);
   m_regfile m_regs (w_clk, w_rs, w_rt, MeWb_rd2, MeWb_w, w_rslt2, w_rrs, w_rrt);
 
   always @(posedge w_clk) begin
@@ -110,9 +112,17 @@ module m_proc11 (w_clk, w_rst, r_rout, r_halt);
     IdEx_rrs  <= #3 w_rrs;
     IdEx_rrt  <= #3 w_rrt;
     IdEx_rrt2 <= #3 w_rrt2;
+    IdEx_rs   <= #3 w_rs;//tasita
+    IdEx_rt   <= #3 w_rt;//tasita
   end
   /**************************** EX stage ***********************************/
-  wire [31:0] #10 w_rslt = IdEx_rrs + IdEx_rrt2; // ALU
+  //mux for data hazard
+  wire [31:0] w_plus1, w_plus2;
+  assign w_plus1 = (IdEx_rs == ExMe_rd2) ? ExMe_rslt : (IdEx_rs == MeWb_rd2) ? w_rslt2 : IdEx_rrs;//mux
+  assign w_plus2 = (IdEx_rt == ExMe_rd2) ? ExMe_rslt : (IdEx_rt == MeWb_rd2) ? w_rslt2 : IdEx_rrt;//mux
+  //wire [31:0] #10 w_rslt = IdEx_rrs + IdEx_rrt2; // ALU
+  wire [31:0] #10 w_rslt = w_plus1 + w_plus2; // ALU origin
+
   always @(posedge w_clk) begin
     ExMe_pc   <= #3 IdEx_pc;
     ExMe_op   <= #3 IdEx_op;
