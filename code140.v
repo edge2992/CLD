@@ -23,13 +23,13 @@ module m_top ();
   wire [31:0] w_rout;
   m_proc11 p (r_clk, r_rst, w_rout, w_halt);
   always@(posedge r_clk) if (w_halt) $finish;
-
+  always@(posedge r_clk) if (r_cnt>=30) $finish;//デバック用
   reg [31:0] r_cnt = 0;
   always@(posedge r_clk) r_cnt <= r_cnt + 1;
   always@(posedge r_clk) begin #90
     $write("%8d : %x %x[%x] %x %x %x | MeWb_rd2 %d[reg_w %d] %x | ExMe_rd2 %d [IdExrs %d IdExrt %d]|[plus1 %d plus2 %d]ExMe_rslt %d MeWb_rslt %d\n",
            r_cnt, p.r_pc, p.IfId_pc, p.w_op, p.IdEx_pc, p.ExMe_pc, p.MeWb_pc,
-           p.MeWb_rd2,p.MeWb_w, p.w_rslt2, p.ExMe_rd2, p.IdEx_rs, p.IdEx_rt,p.w_plus1, p.w_plus2,p.ExMe_rslt, p.MeWb_rslt);
+           p.MeWb_rd2, p.w_rslt2, p.ExMe_rd2, p.IdEx_rs, p.IdEx_rd2,p.ExMe_rslt, p.MeWb_rslt);
   end
 endmodule
 
@@ -40,21 +40,16 @@ module m_main (w_clk, w_btnu, w_btnd, w_led, r_sg, r_an);
   output wire [15:0] w_led;
   output reg [6:0] r_sg;  // cathode segments
   output reg [7:0] r_an;  // common anode
-
   wire w_clk2=w_clk, w_locked=1;
   //clk_wiz_0 clk_wiz (w_clk2, 0, w_locked, w_clk);
-
   wire w_rst = ~w_locked;
   wire [31:0] w_rout;
   wire w_halt;
   m_proc11 p (w_clk2, w_rst, w_rout, w_halt);
-
   reg [31:0] r_cnt = 0;
   always @(posedge w_clk2) r_cnt <= (w_rst) ? 0 : (~w_halt) ? r_cnt + 1 : r_cnt;
-
   wire [31:0] w_data = (w_btnu) ? r_cnt : w_rout;
   assign w_led = (w_btnd) ? w_data[31:16] : w_data[15:0];
-
   wire [6:0] w_sg;
   wire [7:0] w_an;
   m_7segcon m_7segcon(w_clk2, w_data, w_sg, w_an);
@@ -70,7 +65,7 @@ module m_proc11 (w_clk, w_rst, r_rout, r_halt);
 
   reg  [31:0] IfId_pc4=0;                                    // pipe regs
   reg  [31:0] IdEx_rrs=0, IdEx_rrt=0, IdEx_rrt2=0;           //
-  reg   [5:0] IdEx_rs=0, IdEx_rt=0;                          //plus alpha for mux
+  reg   [5:0] IdEx_rs=0;                          //plus alpha for mux
   reg  [31:0] ExMe_rslt=0, ExMe_rrt=0;                       //
   reg  [31:0] MeWb_rslt=0;                                   //
   reg   [5:0]             IdEx_op=0,  ExMe_op=0,  MeWb_op=0; //
@@ -114,15 +109,19 @@ module m_proc11 (w_clk, w_rst, r_rout, r_halt);
     IdEx_rrt  <= #3 w_rrt;
     IdEx_rrt2 <= #3 w_rrt2;
     IdEx_rs   <= #3 w_rs;//tasita
-    IdEx_rt   <= #3 w_rt;//tasita
   end
   /**************************** EX stage ***********************************/
   //mux for data hazard
-  wire [31:0] w_plus1, w_plus2;
-  assign w_plus1 = ((IdEx_rs == ExMe_rd2) && (ExMe_rd2 != 0) && (ExMe_w ==1)) ? ExMe_rslt : ((IdEx_rs == MeWb_rd2)&&(MeWb_rd2 != 0) && (MeWb_w ==1)) ? w_rslt2 : IdEx_rrs;//mux
-  assign w_plus2 = ((IdEx_rt == ExMe_rd2) && (ExMe_rd2 != 0) && (ExMe_w ==1)) ? ExMe_rslt : ((IdEx_rt == MeWb_rd2)&&(MeWb_rd2 != 0) && (MeWb_w ==1)) ? w_rslt2 : IdEx_rrt2;//mux
-  //wire [31:0] #10 w_rslt = IdEx_rrs + IdEx_rrt2; // ALU
-  wire [31:0] #10 w_rslt = w_plus1 + w_plus2; // ALU origin
+  wire [31:0] w_plus1, w_plus2_1,w_plus2_2;
+  assign w_plus1 = ((IdEx_rs == ExMe_rd2) && (ExMe_rd2 != 0)) ? ExMe_rslt :
+  ((MeWb_rd2 != 0)&& (MeWb_rd2 == IdEx_rs))? w_rslt2 : IdEx_rrs;//mux
+
+  assign w_plus2_1 = ((IdEx_rd2 == ExMe_rd2) && (ExMe_rd2 != 0)) ? ExMe_rslt :
+  ((MeWb_rd2 != 0) && (IdEx_rd2 == MeWb_rd2)) ? w_rslt2 : IdEx_rrt2;//mux
+
+  assign w_plus2_2 = (ExMe_op > 6'h5) ? IdEx_rrt2 : w_plus2_1;
+
+  wire [31:0] #10 w_rslt = w_plus1 + w_plus2_2; // ALU origin
 
   always @(posedge w_clk) begin
     ExMe_pc   <= #3 IdEx_pc;
@@ -166,37 +165,95 @@ module m_memory (w_clk, w_addr, w_we, w_din, r_dout);
   end
   initial r_dout = 0;
 
-  initial begin
+
+    initial begin
     cm_ram[0] ={`NOP};                            //     nop
-    cm_ram[1] ={`ADDI, 5'd0, 5'd1, 16'h20};       //     addi $1,  $0, 0x20
-    cm_ram[2] ={`ADDI, 5'd0, 5'd10,16'd1};        //     addi $10, $0, 1
-    //cm_ram[2] ={`SW,   5'd0, 5'd1, 16'd0};        //     sw   $1, 0($0)
-    cm_ram[3] ={`ADDI, 5'd0, 5'd11,16'd2};        //     addi $11, $0, 2
-    cm_ram[4] ={`ADDI, 5'd1, 5'd12,16'd3};        //     addi $12, $0, 3
-    cm_ram[5] ={`ADDI, 5'd0, 5'd13,16'd4};        //     addi $13, $0, 4
-    cm_ram[6] ={`ADDI, 5'd1,5'd10,16'h10};       //     addi $10, $10,0x10
-    cm_ram[7] ={`ADDI, 5'd11,5'd11,16'h10};       //     addi $11, $11,0x10
-    cm_ram[8] ={`ADDI, 5'd12,5'd12,16'h10};       //     addi $12, $12,0x10
-    //cm_ram[8] ={`ADD,  5'd10,5'd11,5'd12,11'h20}; //     add  $12,$10,$11
-    cm_ram[9] ={`ADDI, 5'd13,5'd13,16'h10};       //     addi $13, $13,0x10
-    cm_ram[10]={`ADD,  5'd10,5'd1, 5'd10,11'h20}; //     add  $10,$10,$1
-    cm_ram[11]={`ADD,  5'd11,5'd1, 5'd11,11'h20}; //     add  $11,$11,$1
-    cm_ram[12]={`ADD,  5'd12,5'd1, 5'd12,11'h20}; //     add  $12,$12,$1
-    //cm_ram[13]={`ADD,  5'd13,5'd1, 5'd13,11'h20}; //     add  $13,$13,$1
-    cm_ram[13] ={`LW,   5'd0, 5'd12, 16'd0};       //     lw   $12, 0($0)
-    cm_ram[14]={`HALT, 26'h0};                    //     halt
-    cm_ram[15]={`NOP};                            //     nop
-    cm_ram[16]={`NOP};                            //     nop
+    cm_ram[1] ={`NOP};                            //     nop
+    cm_ram[2] ={`ADDI, 5'd0, 5'd20,16'd0};        //     addi $20, $0, 0
+    cm_ram[3] ={`ADDI, 5'd0, 5'd21,16'd11};       //     addi $21, $0, 11
+    cm_ram[4] ={`ADD,  5'd0, 5'd0, 5'd12,11'h20}; //     addi $12,$0, $0   // sum = 0;
+
+    cm_ram[5] ={`ADDI, 5'd0, 5'd11,16'h0};        // L03 addi $11,$0, 0
+    cm_ram[6] ={`ADDI, 5'd0, 5'd8, 16'd4096};     //     addi $8, $0, 4096
+    cm_ram[7] ={`ADDI, 5'd0, 5'd9, 16'h0};        //     addi $9, $0, 0
+    cm_ram[8] ={`ADDI, 5'd0, 5'd10,16'h0};        //     addi $10,$0, 0
+
+    cm_ram[9] ={`SW,   5'd10,5'd11,16'd0};        // L01:sw   $11,0($10)
+    cm_ram[10]={`ADDI, 5'd9, 5'd9, 16'h1};        //     addi $9, $9, 1
+    cm_ram[11]={`ADDI, 5'd11,5'd11,16'h1};        //     addi $11,$11,1
+    cm_ram[12]={`ADDI, 5'd11,5'd11,16'h1};        //     addi $11,$11,1
+    cm_ram[13]={`ADDI, 5'd11,5'd11,16'h1};        //     addi $11,$11,1
+    cm_ram[14]={`ADDI, 5'd11,5'd11,16'h1};        //     addi $11,$11,1
+    cm_ram[15]={`ADDI, 5'd10,5'd10,16'h4};        //     addi $10,$10,4
+    cm_ram[16]={`BNE,  5'd8, 5'd9, 16'hfff8};     //     bne  $8, $9, L01
     cm_ram[17]={`NOP};                            //     nop
-    cm_ram[18]={`NOP};                            //     nop
-    cm_ram[19]={`NOP};                            //     nop
+
+    cm_ram[18]={`ADDI, 5'd0, 5'd8, 16'd4096};     //     addi $8, $0, 4096
+    cm_ram[19]={`ADDI, 5'd0, 5'd9, 16'h0};        //     addi $9, $0, 0
+    cm_ram[20]={`ADDI, 5'd0, 5'd10,16'h0};        //     addi $10,$0, 0
+
+    cm_ram[21]={`LW,   5'd10,5'd11,16'd0};        // L02:lw   $11,0($10)
+    cm_ram[22]={`ADDI, 5'd9, 5'd9, 16'h1};        //     addi $9, $9, 1
+    cm_ram[23]={`ADDI, 5'd10,5'd10,16'h4};        //     addi $10,$10,4
+    cm_ram[24]={`ADD,  5'd12,5'd11,5'd12,11'h20}; //     add  $12,$12,$11  // sum += $11
+    cm_ram[25]={`ADDI, 5'd12,5'd12,16'h1};        //     addi $12,$12,1    // sum ++;
+    cm_ram[26]={`ADDI, 5'd12,5'd12,16'hffff};     //     addi $12,$12,-1   // sum --;
+    cm_ram[27]={`ADDI, 5'd12,5'd12,16'h1};        //     addi $12,$12,1    // sum ++;
+    cm_ram[28]={`ADDI, 5'd12,5'd12,16'h1};        //     addi $12,$12,1    // sum ++;
+    cm_ram[29]={`ADDI, 5'd12,5'd12,16'hffff};     //     addi $12,$12,-1   // sum --;
+    cm_ram[30]={`ADDI, 5'd12,5'd12,16'h1};        //     addi $12,$12,1    // sum ++;
+    cm_ram[31]={`ADDI, 5'd12,5'd12,16'hfffe};     //     addi $12,$12,-2   // sum -= 2;
+    cm_ram[32]={`BNE,  5'd8, 5'd9, 16'hfff4};     //     bne  $8, $9, L02
+    cm_ram[33]={`NOP};                            //     nop
+
+    cm_ram[34]={`ADDI, 5'd20,5'd20,16'h1};        //     addi $20,$20,1    // j++
+    cm_ram[35]={`ADDI, 5'd8, 5'd8,16'h11};        //     addi $8, $8, 0x11 //
+    cm_ram[36]={`ADDI, 5'd8, 5'd8,16'h12};        //     addi $8, $8, 0x12 //
+    cm_ram[37]={`ADDI, 5'd8, 5'd8,16'h13};        //     addi $8, $8, 0x13 //
+    cm_ram[38]={`ADDI, 5'd8, 5'd8,16'h14};        //     addi $8, $8, 0x14 //
+    cm_ram[39]={`BNE,  5'd20,5'd21,16'hffdd};     //     bne  $20,$21,L03  // (j<4) ?
+    cm_ram[40]={`NOP};                            //     nop
+    cm_ram[41]={`ADD,  5'd12,5'd0, 5'd30,11'h20}; //     add  $30,$12,$0
+    cm_ram[42]={`ADD,  5'd30,5'd0, 5'd0, 11'h20}; //     add  $0, $30,$0 // 5ffa000
+    cm_ram[43]={`HALT, 26'h0};                    //     halt
+    cm_ram[44]={`NOP};                            //     nop
+    cm_ram[45]={`NOP};                            //     nop
+    cm_ram[46]={`NOP};                            //     nop
+    cm_ram[47]={`NOP};                            //     nop
+    cm_ram[48]={`NOP};                            //     nop
   end
+
+  // initial begin
+  //   cm_ram[0] ={`NOP};                            //     nop
+  //   cm_ram[1] ={`ADDI, 5'd0, 5'd1, 16'h20};       //     addi $1,  $0, 0x20
+  //   cm_ram[2] ={`SW,   5'd0, 5'd1, 16'd0};        //     sw   $1, 0($0)
+  //   cm_ram[3] ={`ADDI, 5'd0, 5'd11,16'd2};        //     addi $11, $0, 2
+  //   cm_ram[4] ={`ADDI, 5'd0, 5'd12,16'd3};        //     addi $12, $0, 3
+  //   cm_ram[5] ={`ADDI, 5'd0, 5'd13,16'd4};        //     addi $13, $0, 4
+  // //cm_ram[6] ={`ADDI, 5'd10,5'd10,16'h10};       //     addi $10, $10,0x10
+  //   cm_ram[6] ={`ADDI, 5'd0,5'd10,16'h10};        //     addi $10, $0,0x10
+
+  //   cm_ram[7] ={`ADDI, 5'd11,5'd11,16'h10};       //     addi $11, $11,0x10
+  //   cm_ram[8] ={`ADDI, 5'd12,5'd12,16'h10};       //     addi $12, $12,0x10
+  //   cm_ram[9] ={`ADDI, 5'd13,5'd13,16'h10};       //     addi $13, $13,0x10
+  //   cm_ram[10]={`ADD,  5'd10,5'd1, 5'd10,11'h20}; //     add  $10,$10,$1
+  //   cm_ram[11]={`ADD,  5'd11,5'd1, 5'd11,11'h20}; //     add  $11,$11,$1
+  //   cm_ram[12]={`ADD,  5'd12,5'd1, 5'd12,11'h20}; //     add  $12,$12,$1
+  //   cm_ram[13]={`ADD,  5'd13,5'd1, 5'd13,11'h20}; //     add  $13,$13,$1
+  //   cm_ram[14]={`HALT, 26'h0};                    //     halt
+  //   cm_ram[15]={`NOP};                            //     nop
+  //   cm_ram[16]={`NOP};                            //     nop
+  //   cm_ram[17]={`NOP};                            //     nop
+  //   cm_ram[18]={`NOP};                            //     nop
+  //   cm_ram[19]={`NOP};                            //     nop
+  // end
+
 //    cm_ram[2] ={`SW,   5'd0, 5'd1, 16'd0};        //     sw   $1, 0($0)
+//    cm_ram[2] ={`ADDI, 5'd0, 5'd10,16'd1};        //     addi $10, $0, 1
 //    cm_ram[13] ={`LW,   5'd0, 5'd12, 16'd0};       //     lw   $12, 0($0)
 //    cm_ram[8] ={`ADD,  5'd10,5'd11,5'd12,11'h20}; //     add  $12,$10,$11
-//    cm_ram[2] ={`SW,   5'd0, 5'd1, 16'd0};        //     sw   $1, 0($0)
-//    cm_ram[13] ={`LW,   5'd0, 5'd12, 16'd0};       //     lw   $12, 0($0)
-//    cm_ram[8] ={`ADD,  5'd10,5'd11,5'd12,11'h20}; //     add  $12,$10,$11
+//    cm_ram[8] ={`ADDI, 5'd12,5'd12,16'h10};       //     addi $12, $12,0x10
+//    cm_ram[13]={`ADD,  5'd13,5'd1, 5'd13,11'h20}; //     add  $13,$13,$1
 endmodule
 
 /******************************************************************************/
