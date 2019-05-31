@@ -1,3 +1,4 @@
+
 /******************************************************************************/
 /* Sample Verilog HDL Code for Computer Logic Design     Arch Lab. TOKYO TECH */
 /******************************************************************************/
@@ -26,7 +27,7 @@ module m_top ();
   reg [31:0] r_cnt = 0;
   always@(posedge r_clk) r_cnt <= r_cnt + 1;
   always@(posedge r_clk) begin #90
-    $write("%8d : %x %x[%x] %x %x %x | MeWb_rd2 %d %x | ExMe_rd2 %d [IdExrs %d IdExrt %d]|ExMe_rslt %d MeWb_rslt %d\n",
+    $write("%8d : %x %x[%x] %x %x %x | MeWb_rd2 %d[reg_w %d] %x | ExMe_rd2 %d [IdExrs %d IdExrt %d]|[plus1 %d plus2 %d]ExMe_rslt %d MeWb_rslt %d\n",
            r_cnt, p.r_pc, p.IfId_pc, p.w_op, p.IdEx_pc, p.ExMe_pc, p.MeWb_pc,
            p.MeWb_rd2, p.w_rslt2, p.ExMe_rd2, p.IdEx_rs, p.IdEx_rd2,p.ExMe_rslt, p.MeWb_rslt);
   end
@@ -112,12 +113,12 @@ module m_proc11 (w_clk, w_rst, r_rout, r_halt);
   /**************************** EX stage ***********************************/
   //mux for data hazard
   wire [31:0] w_plus1, w_plus2_1,w_plus2_2;
-  assign w_plus1 = ((IdEx_rs == ExMe_rd2) && (ExMe_rd2 != 0)) ? ExMe_rslt : 
+  assign w_plus1 = ((IdEx_rs == ExMe_rd2) && (ExMe_rd2 != 0)) ? ExMe_rslt :
   ((MeWb_rd2 != 0)&& (MeWb_rd2 == IdEx_rs))? w_rslt2 : IdEx_rrs;//mux
 
-  assign w_plus2_1 = ((IdEx_rd2 == ExMe_rd2) && (ExMe_rd2 != 0)) ? ExMe_rslt : 
+  assign w_plus2_1 = ((IdEx_rd2 == ExMe_rd2) && (ExMe_rd2 != 0)) ? ExMe_rslt :
   ((MeWb_rd2 != 0) && (IdEx_rd2 == MeWb_rd2)) ? w_rslt2 : IdEx_rrt2;//mux
-  
+
   assign w_plus2_2 = (ExMe_op > 6'h5) ? IdEx_rrt2 : w_plus2_1;
 
   wire [31:0] #10 w_rslt = w_plus1 + w_plus2_2; // ALU origin
@@ -171,7 +172,7 @@ module m_memory (w_clk, w_addr, w_we, w_din, r_dout);
     cm_ram[2] ={`ADDI, 5'd0, 5'd20,16'd0};        //     addi $20, $0, 0
     cm_ram[3] ={`ADDI, 5'd0, 5'd21,16'd11};       //     addi $21, $0, 11
     cm_ram[4] ={`ADD,  5'd0, 5'd0, 5'd12,11'h20}; //     addi $12,$0, $0   // sum = 0;
-    
+
     cm_ram[5] ={`ADDI, 5'd0, 5'd11,16'h0};        // L03 addi $11,$0, 0
     cm_ram[6] ={`ADDI, 5'd0, 5'd8, 16'd4096};     //     addi $8, $0, 4096
     cm_ram[7] ={`ADDI, 5'd0, 5'd9, 16'h0};        //     addi $9, $0, 0
@@ -204,12 +205,12 @@ module m_memory (w_clk, w_addr, w_we, w_din, r_dout);
     cm_ram[31]={`ADDI, 5'd12,5'd12,16'hfffe};     //     addi $12,$12,-2   // sum -= 2;
     cm_ram[32]={`BNE,  5'd8, 5'd9, 16'hfff4};     //     bne  $8, $9, L02
     cm_ram[33]={`NOP};                            //     nop
-    
+
     cm_ram[34]={`ADDI, 5'd20,5'd20,16'h1};        //     addi $20,$20,1    // j++
     cm_ram[35]={`ADDI, 5'd8, 5'd8,16'h11};        //     addi $8, $8, 0x11 //
-    cm_ram[36]={`ADDI, 5'd8, 5'd8,16'h12};        //     addi $8, $8, 0x12 // 
+    cm_ram[36]={`ADDI, 5'd8, 5'd8,16'h12};        //     addi $8, $8, 0x12 //
     cm_ram[37]={`ADDI, 5'd8, 5'd8,16'h13};        //     addi $8, $8, 0x13 //
-    cm_ram[38]={`ADDI, 5'd8, 5'd8,16'h14};        //     addi $8, $8, 0x14 //    
+    cm_ram[38]={`ADDI, 5'd8, 5'd8,16'h14};        //     addi $8, $8, 0x14 //
     cm_ram[39]={`BNE,  5'd20,5'd21,16'hffdd};     //     bne  $20,$21,L03  // (j<4) ?
     cm_ram[40]={`NOP};                            //     nop
     cm_ram[41]={`ADD,  5'd12,5'd0, 5'd30,11'h20}; //     add  $30,$12,$0
@@ -231,7 +232,7 @@ module m_memory (w_clk, w_addr, w_we, w_din, r_dout);
   //   cm_ram[5] ={`ADDI, 5'd0, 5'd13,16'd4};        //     addi $13, $0, 4
   // //cm_ram[6] ={`ADDI, 5'd10,5'd10,16'h10};       //     addi $10, $10,0x10
   //   cm_ram[6] ={`ADDI, 5'd0,5'd10,16'h10};        //     addi $10, $0,0x10
-    
+
   //   cm_ram[7] ={`ADDI, 5'd11,5'd11,16'h10};       //     addi $11, $11,0x10
   //   cm_ram[8] ={`ADDI, 5'd12,5'd12,16'h10};       //     addi $12, $12,0x10
   //   cm_ram[9] ={`ADDI, 5'd13,5'd13,16'h10};       //     addi $13, $13,0x10
