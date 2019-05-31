@@ -23,13 +23,13 @@ module m_top ();
   wire [31:0] w_rout;
   m_proc11 p (r_clk, r_rst, w_rout, w_halt);
   always@(posedge r_clk) if (w_halt) $finish;
-  always@(posedge r_clk) if (r_cnt>=30) $finish;//デバック用
+  //always@(posedge r_clk) if (r_cnt>=100) $finish;//デバック用
   reg [31:0] r_cnt = 0;
   always@(posedge r_clk) r_cnt <= r_cnt + 1;
   always@(posedge r_clk) begin #90
-    $write("%8d : %x %x[%x] %x %x %x | MeWb_rd2 %d %x | ExMe_rd2 %d [IdExrs %d IdExrt %d]|ExMe_rslt %d MeWb_rslt %d\n",
+    $write("%8d : %x %x[%x] %x %x %x | MeWb_rd2 %d %d | ExMe_rd2 %d [w_rrs %d w_rrt %d w_rrt2 %d]|ExMe_rslt %d MeWb_rslt %d\n",
        r_cnt, p.r_pc, p.IfId_pc, p.w_op, p.IdEx_pc, p.ExMe_pc, p.MeWb_pc,
-       p.MeWb_rd2, p.w_rslt2, p.ExMe_rd2, p.IdEx_rs, p.IdEx_rt,p.ExMe_rslt, p.MeWb_rslt);
+       p.MeWb_rd2, p.w_rslt2, p.ExMe_rd2, p.w_rrs,p.w_rrt, p.w_rrt2,p.ExMe_rslt, p.MeWb_rslt);
   end
 endmodule
 
@@ -114,11 +114,11 @@ module m_proc11 (w_clk, w_rst, r_rout, r_halt);
   /**************************** EX stage ***********************************/
   //mux for data hazard
   wire [31:0] w_plus1, w_plus2_1,w_plus2_2;
-  assign w_plus1 = ((IdEx_rs == ExMe_rd2) && (ExMe_rd2 != 0)) ? ExMe_rslt :
-  ((MeWb_rd2 != 0)&& (MeWb_rd2 == IdEx_rs))? w_rslt2 : IdEx_rrs;//mux
+  assign w_plus1 = ((IdEx_rs == ExMe_rd2) && (ExMe_rd2 != 0) && ExMe_w) ? ExMe_rslt :
+  ((MeWb_rd2 != 0)&& (MeWb_rd2 == IdEx_rs)&& MeWb_w)? w_rslt2 : IdEx_rrs;//mux
 
-  assign w_plus2_1 = ((IdEx_rt == ExMe_rd2) && (ExMe_rd2 != 0)) ? ExMe_rslt :
-  ((MeWb_rd2 != 0) && (IdEx_rt == MeWb_rd2)) ? w_rslt2 : IdEx_rrt2;//mux
+  assign w_plus2_1 = ((IdEx_rt == ExMe_rd2) && (ExMe_rd2 != 0) && ExMe_w) ? ExMe_rslt :
+  ((MeWb_rd2 != 0) && (IdEx_rt == MeWb_rd2)&& MeWb_w) ? w_rslt2 : IdEx_rrt2;//mux
 
   assign w_plus2_2 = (ExMe_op > 6'h5) ? IdEx_rrt2 : w_plus2_1;
 
@@ -267,9 +267,9 @@ module m_regfile (w_clk, w_rr1, w_rr2, w_wr, w_we, w_wdata, w_rdata1, w_rdata2);
 
   reg [31:0] r[0:31];
   assign #15 w_rdata1 = (w_rr1==0) ? 0 :
-   (w_rr1==w_wr) ? w_wdata :r[w_rr1];
+   (w_we && (w_rr1==w_wr)) ? w_wdata :r[w_rr1];
   assign #15 w_rdata2 = (w_rr2==0) ? 0 :
-  (w_rr2==w_wr) ? w_wdata : r[w_rr2];
+   (w_we && (w_rr2==w_wr)) ? w_wdata : r[w_rr2];
   always @(posedge w_clk) if(w_we) r[w_wr] <= w_wdata;
 
   initial begin
