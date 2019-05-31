@@ -27,9 +27,9 @@ module m_top ();
   reg [31:0] r_cnt = 0;
   always@(posedge r_clk) r_cnt <= r_cnt + 1;
   always@(posedge r_clk) begin #90
-    $write("%8d : %x %x[%x] %x %x %x | MeWb_rd2 %d[reg_w %d] %x | ExMe_rd2 %d [IdExrs %d IdExrt %d]|[plus1 %d plus2 %d]ExMe_rslt %d MeWb_rslt %d\n",
-           r_cnt, p.r_pc, p.IfId_pc, p.w_op, p.IdEx_pc, p.ExMe_pc, p.MeWb_pc,
-           p.MeWb_rd2, p.w_rslt2, p.ExMe_rd2, p.IdEx_rs, p.IdEx_rd2,p.ExMe_rslt, p.MeWb_rslt);
+    $write("%8d : %x %x[%x] %x %x %x | MeWb_rd2 %d %x | ExMe_rd2 %d [IdExrs %d IdExrt %d]|ExMe_rslt %d MeWb_rslt %d\n",
+       r_cnt, p.r_pc, p.IfId_pc, p.w_op, p.IdEx_pc, p.ExMe_pc, p.MeWb_pc,
+       p.MeWb_rd2, p.w_rslt2, p.ExMe_rd2, p.IdEx_rs, p.IdEx_rt,p.ExMe_rslt, p.MeWb_rslt);
   end
 endmodule
 
@@ -65,7 +65,7 @@ module m_proc11 (w_clk, w_rst, r_rout, r_halt);
 
   reg  [31:0] IfId_pc4=0;                                    // pipe regs
   reg  [31:0] IdEx_rrs=0, IdEx_rrt=0, IdEx_rrt2=0;           //
-  reg   [5:0] IdEx_rs=0;                          //plus alpha for mux
+  reg   [5:0] IdEx_rs=0, IdEx_rt=0;                          //plus alpha for mux
   reg  [31:0] ExMe_rslt=0, ExMe_rrt=0;                       //
   reg  [31:0] MeWb_rslt=0;                                   //
   reg   [5:0]             IdEx_op=0,  ExMe_op=0,  MeWb_op=0; //
@@ -109,6 +109,7 @@ module m_proc11 (w_clk, w_rst, r_rout, r_halt);
     IdEx_rrt  <= #3 w_rrt;
     IdEx_rrt2 <= #3 w_rrt2;
     IdEx_rs   <= #3 w_rs;//tasita
+    IdEx_rt   <= #3 (w_op==0) ? w_rt : 0;//tasita zisinnnai
   end
   /**************************** EX stage ***********************************/
   //mux for data hazard
@@ -116,8 +117,8 @@ module m_proc11 (w_clk, w_rst, r_rout, r_halt);
   assign w_plus1 = ((IdEx_rs == ExMe_rd2) && (ExMe_rd2 != 0)) ? ExMe_rslt :
   ((MeWb_rd2 != 0)&& (MeWb_rd2 == IdEx_rs))? w_rslt2 : IdEx_rrs;//mux
 
-  assign w_plus2_1 = ((IdEx_rd2 == ExMe_rd2) && (ExMe_rd2 != 0)) ? ExMe_rslt :
-  ((MeWb_rd2 != 0) && (IdEx_rd2 == MeWb_rd2)) ? w_rslt2 : IdEx_rrt2;//mux
+  assign w_plus2_1 = ((IdEx_rt == ExMe_rd2) && (ExMe_rd2 != 0)) ? ExMe_rslt :
+  ((MeWb_rd2 != 0) && (IdEx_rt == MeWb_rd2)) ? w_rslt2 : IdEx_rrt2;//mux
 
   assign w_plus2_2 = (ExMe_op > 6'h5) ? IdEx_rrt2 : w_plus2_1;
 
@@ -265,8 +266,10 @@ module m_regfile (w_clk, w_rr1, w_rr2, w_wr, w_we, w_wdata, w_rdata1, w_rdata2);
   output wire [31:0] w_rdata1, w_rdata2;
 
   reg [31:0] r[0:31];
-  assign #15 w_rdata1 = (w_rr1==0) ? 0 : r[w_rr1];
-  assign #15 w_rdata2 = (w_rr2==0) ? 0 : r[w_rr2];
+  assign #15 w_rdata1 = (w_rr1==0) ? 0 :
+   (w_rr1==w_wr) ? w_wdata :r[w_rr1];
+  assign #15 w_rdata2 = (w_rr2==0) ? 0 :
+  (w_rr2==w_wr) ? w_wdata : r[w_rr2];
   always @(posedge w_clk) if(w_we) r[w_wr] <= w_wdata;
 
   initial begin
