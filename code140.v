@@ -112,17 +112,15 @@ module m_proc11 (w_clk, w_rst, r_rout, r_halt);
   /**************************** EX stage ***********************************/
   //mux for data hazard
   wire [31:0] w_plus1, w_plus2_1,w_plus2_2;
-  assign w_plus1 = (ExMe_w && (IdEx_rs == ExMe_rd2) && (ExMe_rd2 != 0)) ? ExMe_rslt : 
-  (MeWb_w
-  && (MeWb_rd2 != 0)
-  && !(ExMe_w && (ExMe_rd2 != 0) && (ExMe_rd2 != IdEx_rs)) 
+  assign w_plus1 = ((IdEx_rs == ExMe_rd2) && (ExMe_rd2 != 0)) ? ExMe_rslt : 
+  ((MeWb_rd2 != 0)
+  && !((ExMe_rd2 != 0) && (ExMe_rd2 != IdEx_rs)) 
   && (MeWb_rd2 == IdEx_rs))
   ? w_rslt2 : IdEx_rrs;//mux
 
-  assign w_plus2_1 = (ExMe_w && (IdEx_rd2 == ExMe_rd2) && (ExMe_rd2 != 0)) ? ExMe_rslt : 
-  (MeWb_w 
-  && (MeWb_rd2 != 0)
-  && !(ExMe_w && (ExMe_rd2 != 0) && (ExMe_rd2 != IdEx_rd2))
+  assign w_plus2_1 = ((IdEx_rd2 == ExMe_rd2) && (ExMe_rd2 != 0)) ? ExMe_rslt : 
+  ((MeWb_rd2 != 0)
+  && !((ExMe_rd2 != 0) && (ExMe_rd2 != IdEx_rd2))
   && (IdEx_rd2 == MeWb_rd2)) 
   ? w_rslt2 : IdEx_rrt2;//mux
   assign w_plus2_2 = (ExMe_op > 6'h5) ? IdEx_rrt2 : w_plus2_1;
