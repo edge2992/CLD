@@ -22,9 +22,9 @@ module m_top ();
   wire [31:0] w_rout;
   m_proc11 p (r_clk, r_rst, w_rout, w_halt);
   always@(posedge r_clk) if (w_halt) $finish;
-
   reg [31:0] r_cnt = 0;
   always@(posedge r_clk) r_cnt <= r_cnt + 1;
+  always@(posedge r_clk) if (r_cnt>=30) $finish;//デバック用
   always@(posedge r_clk) begin #90
     $write("%8d : %x %x[%x] %x %x %x | MeWb_rd2 %d %x | ExMe_rd2 %d [IdExrs %d IdExrt %d]|ExMe_rslt %d MeWb_rslt %d\n",
            r_cnt, p.r_pc, p.IfId_pc, p.w_op, p.IdEx_pc, p.ExMe_pc, p.MeWb_pc,
@@ -112,17 +112,15 @@ module m_proc11 (w_clk, w_rst, r_rout, r_halt);
   /**************************** EX stage ***********************************/
   //mux for data hazard
   wire [31:0] w_plus1, w_plus2;
-  assign w_plus1 = (ExMe_w && (IdEx_rs == ExMe_rd2) && (ExMe_rd2 != 0)) ? ExMe_rslt :
-  (MeWb_w
-  && (MeWb_rd2 != 0)
-  && !(ExMe_w && (ExMe_rd2 != 0) && (ExMe_rd2 != IdEx_rs))//MEMステージからフォワーディングするため(cmram[11]~cmram[14]への対処)
+  assign w_plus1 = ( (IdEx_rs == ExMe_rd2) && (ExMe_rd2 != 0)) ? ExMe_rslt :
+  ((MeWb_rd2 != 0)
+  && !((ExMe_rd2 != 0) && (ExMe_rd2 != IdEx_rs))//MEMステージからフォワーディングするため(cmram[11]~cmram[14]への対処)
   && (MeWb_rd2 == IdEx_rs))
   ? w_rslt2 : IdEx_rrs;//mux
 
-  assign w_plus2 = (ExMe_w && (IdEx_rd2 == ExMe_rd2) && (ExMe_rd2 != 0)) ? ExMe_rslt :
-  (MeWb_w
-  && (MeWb_rd2 != 0)
-  && !(ExMe_w && (ExMe_rd2 != 0) && (ExMe_rd2 != IdEx_rd2))//MEMステージからフォワーディングするため(cmram[11]~cmram[14]への対処)
+  assign w_plus2 = ((IdEx_rd2 == ExMe_rd2) && (ExMe_rd2 != 0)) ? ExMe_rslt :
+  ((MeWb_rd2 != 0)
+  && !((ExMe_rd2 != 0) && (ExMe_rd2 != IdEx_rd2))//MEMステージからフォワーディングするため(cmram[11]~cmram[14]への対処)
   && (IdEx_rd2 == MeWb_rd2))
   ? w_rslt2 : IdEx_rrt2;//mux
 
