@@ -28,7 +28,7 @@ module m_top ();
   always@(posedge r_clk) begin #90
     $write("%8d : %x %x[%x] %x %x %x | MeWb_rd2 %d %x | ExMe_rd2 %d [IdExrs %d IdExrt %d]|ExMe_rslt %d MeWb_rslt %d\n",
            r_cnt, p.r_pc, p.IfId_pc, p.w_op, p.IdEx_pc, p.ExMe_pc, p.MeWb_pc,
-           p.MeWb_rd2, p.w_rslt2, p.ExMe_rd2, p.IdEx_rs, p.IdEx_rt,p.ExMe_rslt, p.MeWb_rslt);
+           p.MeWb_rd2, p.w_rslt2, p.ExMe_rd2, p.IdEx_rs, p.IdEx_rd2,p.ExMe_rslt, p.MeWb_rslt);
   end
 endmodule
 
@@ -64,7 +64,7 @@ module m_proc11 (w_clk, w_rst, r_rout, r_halt);
 
   reg  [31:0] IfId_pc4=0;                                    // pipe regs
   reg  [31:0] IdEx_rrs=0, IdEx_rrt=0, IdEx_rrt2=0;           //
-  reg   [5:0] IdEx_rs=0, IdEx_rt=0;                          //plus alpha for mux
+  reg   [5:0] IdEx_rs=0;                          //plus alpha for mux
   reg  [31:0] ExMe_rslt=0, ExMe_rrt=0;                       //
   reg  [31:0] MeWb_rslt=0;                                   //
   reg   [5:0]             IdEx_op=0,  ExMe_op=0,  MeWb_op=0; //
@@ -108,7 +108,6 @@ module m_proc11 (w_clk, w_rst, r_rout, r_halt);
     IdEx_rrt  <= #3 w_rrt;
     IdEx_rrt2 <= #3 w_rrt2;
     IdEx_rs   <= #3 w_rs;//tasita
-    IdEx_rt   <= #3 w_rt;//tasita
   end
   /**************************** EX stage ***********************************/
   //mux for data hazard
@@ -120,30 +119,16 @@ module m_proc11 (w_clk, w_rst, r_rout, r_halt);
   && (MeWb_rd2 == IdEx_rs))
   ? w_rslt2 : IdEx_rrs;//mux
 
-  assign w_plus2_1 = (ExMe_w && (IdEx_rt == ExMe_rd2) && (ExMe_rd2 != 0)) ? ExMe_rslt : 
+  assign w_plus2_1 = (ExMe_w && (IdEx_rd2 == ExMe_rd2) && (ExMe_rd2 != 0)) ? ExMe_rslt : 
   (MeWb_w 
   && (MeWb_rd2 != 0)
-  && !(ExMe_w && (ExMe_rd2 != 0) && (ExMe_rd2 != IdEx_rt))
-  && (IdEx_rt == MeWb_rd2)) 
+  && !(ExMe_w && (ExMe_rd2 != 0) && (ExMe_rd2 != IdEx_rd2))
+  && (IdEx_rd2 == MeWb_rd2)) 
   ? w_rslt2 : IdEx_rrt2;//mux
-  assign w_plus2_2 = (w_op > 6'h5) ? IdEx_rrt2 : w_plus2_1;
+  assign w_plus2_2 = (ExMe_op > 6'h5) ? IdEx_rrt2 : w_plus2_1;
 
-  //wire [31:0] #10 w_rslt = IdEx_rrs + IdEx_rrt2; // ALU
   wire [31:0] #10 w_rslt = w_plus1 + w_plus2_2; // ALU origin
 
-  // wire [31:0] w_plus1, w_plus2;
-  // assign w_plus1 = ((IdEx_rs == ExMe_rd2) && (ExMe_rd2 != 0)) ? ExMe_rslt : ((IdEx_rs == MeWb_rd2)&&(MeWb_rd2 != 0)) ? w_rslt2 : IdEx_rrs;//mux
-  // assign w_plus2 = ((IdEx_rt == ExMe_rd2) && (ExMe_rd2 != 0)) ? ExMe_rslt : ((IdEx_rt == MeWb_rd2)&&(MeWb_rd2 != 0)) ? w_rslt2 : IdEx_rrt2;//mux
-  // //wire [31:0] #10 w_rslt = IdEx_rrs + IdEx_rrt2; // ALU
-  // wire [31:0] #10 w_rslt = w_plus1 + w_plus2; // ALU origin
-
-  /*
-    cm_ram[8] ={`ADDI, 5'd0, 5'd10,16'h0};        //     addi $10,$0, 0
-    cm_ram[9] ={`SW,   5'd10,5'd11,16'd0};        // L01:sw   $11,0($10)
-    の解消
-  */
-  wire [31:0] w_Ex_rrt;
-  assign w_Ex_rrt = ((IdEx_op > 6'h27) && (IdEx_rs == ExMe_rd2)) ? ExMe_rslt : IdEx_rrt; 
   always @(posedge w_clk) begin
     ExMe_pc   <= #3 IdEx_pc;
     ExMe_op   <= #3 IdEx_op;
@@ -151,8 +136,7 @@ module m_proc11 (w_clk, w_rst, r_rout, r_halt);
     ExMe_w    <= #3 IdEx_w;
     ExMe_we   <= #3 IdEx_we;
     ExMe_rslt <= #3 w_rslt;
-    ExMe_rrt  <= #3 w_Ex_rrt;
-    //ExMe_rrt  <= #3 w_plus2_1;
+    ExMe_rrt  <= #3 IdEx_rrt;
   end
   /**************************** MEM stage **********************************/
   m_memory m_dmem (w_clk, ExMe_rslt[13:2], ExMe_we, ExMe_rrt, MeWb_ldd);
