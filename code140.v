@@ -143,7 +143,7 @@ module m_proc11 (w_clk, w_rst, r_rout, r_halt);
     の解消
   */
   wire [31:0] w_Ex_rrt;
-  assign w_Ex_rrt = ((Id_Ex_op > 6'h27) && (IdEx_rs == ExMe_rd2)) ? ExMe_rslt : IdEx_rrt; 
+  assign w_Ex_rrt = ((IdEx_op > 6'h27) && (IdEx_rs == ExMe_rd2)) ? ExMe_rslt : IdEx_rrt; 
   always @(posedge w_clk) begin
     ExMe_pc   <= #3 IdEx_pc;
     ExMe_op   <= #3 IdEx_op;
