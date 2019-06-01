@@ -1,9 +1,9 @@
 //2019のコンテストで使うプログラム
 initial begin 
-cm_ram[0] ={NOP}; // nop 
-cm_ram[1] ={NOP}; // nop 
-cm_ram[2] ={ADDI, 5'd0, 5'd20,16'd0}; // addi $20, $0, 0 
-cm_ram[3] ={ADDI, 5'd0, 5'd21,16'd11}; // addi $21, $0, 11 
+cm_ram[0] ={`NOP}; // nop 
+cm_ram[1] ={`NOP}; // nop 
+cm_ram[2] ={`ADDI, 5'd0, 5'd20,16'd0}; // addi $20, $0, 0 
+cm_ram[3] ={`ADDI, 5'd0, 5'd21,16'd11}; // addi $21, $0, 11 
 cm_ram[4] ={`ADD, 5'd0, 5'd0, 5'd12,11'h20}; // addi $12,$0, $0 // sum = 0;
 
 cm_ram[5] ={`ADDI, 5'd0, 5'd11,16'h0};        // L03 addi $11,$0, 0
