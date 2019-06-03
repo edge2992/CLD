@@ -33,7 +33,7 @@ module m_top ();
   end
 
   initial begin
-    $dumpfile("code140.vcd");
+    $dumpfile("code140_id.vcd");
     $dumpvars(0, p);
   end
 endmodule
