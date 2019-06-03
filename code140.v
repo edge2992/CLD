@@ -79,6 +79,7 @@ module m_proc11 (w_clk, w_rst, r_rout, r_halt);
   reg   [4:0] Idhalf_rd2=0, IfId_rd2=0, IdEx_rd2=0, ExMe_rd2=0, MeWb_rd2=0, Wb_rd2=0;//
   reg         Idhalf_w=0, IfId_w=0,   IdEx_w=0,   ExMe_w=0,   MeWb_w=0, Wb_w=0;  //
   reg         Idhalf_we=0, IfId_we=0,  IdEx_we=0,  ExMe_we=0;             //
+  reg IdEx_taken=0;
   wire [31:0] IfId_ir, IfId_ir2, MeWb_ldd;                             // note
   /**************************** IF stage **********************************/
   wire w_taken;
@@ -101,12 +102,11 @@ module m_proc11 (w_clk, w_rst, r_rout, r_halt);
   wire  [4:0] w_rd2   = (w_op!=0) ? w_rt : w_rd;
   wire [15:0] w_imm   = IfId_ir2[15:0];
   wire [31:0] w_imm32 = {{16{w_imm[15]}}, w_imm};
-  assign IfId_ir2 = (w_taken) ? `NOP : IfId_ir;
+  assign IfId_ir2 = (IdEx_taken) ? `NOP : IfId_ir;
   m_regfile m_regs (w_clk, w_rs, w_rt, MeWb_rd2, MeWb_w, w_rslt2, w_rrs, w_rrt);
   always @(posedge w_clk) begin
     Idhalf_sftl2 <= #3 {w_imm32[29:0], 2'h0};
     Idhalf_imm32 <= #3 {{16{w_imm[15]}}, w_imm};
-
     Idhalf_pc   <= #3 IfId_pc;
     Idhalf_pc4  <= #3 IfId_pc4;
     Idhalf_op   <= #3 w_op;
@@ -125,6 +125,7 @@ module m_proc11 (w_clk, w_rst, r_rout, r_halt);
 
 
   always @(posedge w_clk) begin
+    IdEx_taken<= #3 w_taken;
     IdEx_pc   <= #3 Idhalf_pc;
     IdEx_op   <= #3 Idhalf_op;
     IdEx_rd2  <= #3 Idhalf_rd2;
@@ -139,6 +140,7 @@ module m_proc11 (w_clk, w_rst, r_rout, r_halt);
   /**************************** EX stage ***********************************/
   //mux for data hazard
   wire [31:0] w_plus1, w_plus2_1,w_plus2_2;
+  wire [31:0] w_rrt_for;
   assign w_plus1 = ((IdEx_rs == ExMe_rd2) && (ExMe_rd2 != 0) && ExMe_w) ? ExMe_rslt :
   ((MeWb_rd2 != 0)&& (MeWb_rd2 == IdEx_rs)&& MeWb_w)? w_rslt2  :
   ((Wb_rd2 != 0)&& (Wb_rd2 == IdEx_rs)&& Wb_w) ? Wb_rslt2 : IdEx_rrs;//mux
@@ -146,6 +148,10 @@ module m_proc11 (w_clk, w_rst, r_rout, r_halt);
   assign w_plus2_1 = ((IdEx_rt == ExMe_rd2) && (ExMe_rd2 != 0) && ExMe_w) ? ExMe_rslt :
   ((MeWb_rd2 != 0) && (IdEx_rt == MeWb_rd2)&& MeWb_w) ? w_rslt2 :
   ((Wb_rd2 != 0)&& (Wb_rd2 == IdEx_rt)&& Wb_w) ? Wb_rslt2 : IdEx_rrt2;//mux
+
+  assign w_rrt_for = ((IdEx_rt == ExMe_rd2) && (ExMe_rd2 != 0) && ExMe_w) ? ExMe_rslt :
+  ((MeWb_rd2 != 0) && (IdEx_rt == MeWb_rd2)&& MeWb_w) ? w_rslt2 :
+  ((Wb_rd2 != 0)&& (Wb_rd2 == IdEx_rt)&& Wb_w) ? Wb_rslt2 : IdEx_rrt;//mux
 
   assign w_plus2_2 = (ExMe_op > 6'h5) ? IdEx_rrt2 : w_plus2_1;
 
@@ -158,7 +164,7 @@ module m_proc11 (w_clk, w_rst, r_rout, r_halt);
     ExMe_w    <= #3 IdEx_w;
     ExMe_we   <= #3 IdEx_we;
     ExMe_rslt <= #3 w_rslt;
-    ExMe_rrt  <= #3 IdEx_rrt;
+    ExMe_rrt  <= #3 w_rrt_for;
   end
   /**************************** MEM stage **********************************/
   m_memory m_dmem (w_clk, ExMe_rslt[13:2], ExMe_we, ExMe_rrt, MeWb_ldd);
@@ -299,9 +305,9 @@ module m_regfile (w_clk, w_rr1, w_rr2, w_wr, w_we, w_wdata, r_rdata1, r_rdata2);
 
   reg [31:0] r[0:31];
   always @(posedge w_clk) begin
-    if(w_we) r[w_wr] <= w_wdata;
     r_rdata1 = (w_rr1==0) ? 0 : (w_we && (w_rr1==w_wr)) ? w_wdata : r[w_rr1];
     r_rdata2 = (w_rr2==0) ? 0 : (w_we && (w_rr2==w_wr)) ? w_wdata : r[w_rr2];
+    if(w_we) r[w_wr] <= w_wdata;
   end
 
   initial begin
