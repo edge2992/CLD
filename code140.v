@@ -72,12 +72,12 @@ module m_proc11 (w_clk, w_rst, r_rout, r_halt);
   reg  [31:0] Idhalf_imm32=0, Idhalf_sftl2=0;                // plus
   reg  [31:0] IdEx_rrs=0, IdEx_rrt=0, IdEx_rrt2=0;           //
   reg   [5:0] Idhalf_rs=0,IdEx_rs=0, Idhalf_rt=0, IdEx_rt=0; //plus alpha for mux
-  reg  [31:0] ExMe_rslt=0, ExMe_rrt=0;                       //
+  reg  [31:0] ExMe_rslt=0, ExMe_rrt=0, Wb_rslt2=0;                       //
   reg  [31:0] MeWb_rslt=0;                                   //
   reg   [5:0]             Idhalf_op=0, IdEx_op=0,  ExMe_op=0,  MeWb_op=0; //
   reg  [31:0] Idhalf_pc=0, IfId_pc=0,  IdEx_pc=0,  ExMe_pc=0,  MeWb_pc=0; //
-  reg   [4:0] Idhalf_rd2=0, IfId_rd2=0, IdEx_rd2=0, ExMe_rd2=0, MeWb_rd2=0;//
-  reg         Idhalf_w=0, IfId_w=0,   IdEx_w=0,   ExMe_w=0,   MeWb_w=0;  //
+  reg   [4:0] Idhalf_rd2=0, IfId_rd2=0, IdEx_rd2=0, ExMe_rd2=0, MeWb_rd2=0, Wb_rd2=0;//
+  reg         Idhalf_w=0, IfId_w=0,   IdEx_w=0,   ExMe_w=0,   MeWb_w=0, Wb_w=0;  //
   reg         Idhalf_we=0, IfId_we=0,  IdEx_we=0,  ExMe_we=0;             //
   wire [31:0] IfId_ir, IfId_ir2, MeWb_ldd;                             // note
   /**************************** IF stage **********************************/
@@ -140,10 +140,12 @@ module m_proc11 (w_clk, w_rst, r_rout, r_halt);
   //mux for data hazard
   wire [31:0] w_plus1, w_plus2_1,w_plus2_2;
   assign w_plus1 = ((IdEx_rs == ExMe_rd2) && (ExMe_rd2 != 0) && ExMe_w) ? ExMe_rslt :
-  ((MeWb_rd2 != 0)&& (MeWb_rd2 == IdEx_rs)&& MeWb_w)? w_rslt2 : IdEx_rrs;//mux
+  ((MeWb_rd2 != 0)&& (MeWb_rd2 == IdEx_rs)&& MeWb_w)? w_rslt2  :
+  ((Wb_rd2 != 0)&& (Wb_rd2 == IdEx_rs)&& Wb_w) ? Wb_rslt2 : IdEx_rrs;//mux
 
   assign w_plus2_1 = ((IdEx_rt == ExMe_rd2) && (ExMe_rd2 != 0) && ExMe_w) ? ExMe_rslt :
-  ((MeWb_rd2 != 0) && (IdEx_rt == MeWb_rd2)&& MeWb_w) ? w_rslt2 : IdEx_rrt2;//mux
+  ((MeWb_rd2 != 0) && (IdEx_rt == MeWb_rd2)&& MeWb_w) ? w_rslt2 :
+  ((Wb_rd2 != 0)&& (Wb_rd2 == IdEx_rt)&& Wb_w) ? Wb_rslt2 : IdEx_rrt2;//mux
 
   assign w_plus2_2 = (ExMe_op > 6'h5) ? IdEx_rrt2 : w_plus2_1;
 
@@ -174,6 +176,11 @@ module m_proc11 (w_clk, w_rst, r_rout, r_halt);
   always @(posedge w_clk) if (MeWb_op==`HALT) r_halt <= 1;
   initial r_rout = 0;
   reg [31:0] r_tmp=0;
+  always @(posedge w_clk) begin//for original deta hazard
+    Wb_rd2 <= #3 MeWb_rd2;
+    Wb_w   <= #3 MeWb_w;
+    Wb_rslt2 <= #3 w_rslt2;
+  end
   always @(posedge w_clk) r_tmp <= (w_rst) ? 0 : (w_rs==30) ? w_rrs : r_tmp;
   always @(posedge w_clk) r_rout <= r_tmp;
 endmodule
