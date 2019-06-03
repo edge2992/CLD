@@ -23,13 +23,18 @@ module m_top ();
   wire [31:0] w_rout;
   m_proc11 p (r_clk, r_rst, w_rout, w_halt);
   always@(posedge r_clk) if (w_halt) $finish;
-  //always@(posedge r_clk) if (r_cnt>=100) $finish;//デバック用
+  always@(posedge r_clk) if (r_cnt>=100) $finish;//デバック用
   reg [31:0] r_cnt = 0;
   always@(posedge r_clk) r_cnt <= r_cnt + 1;
   always@(posedge r_clk) begin #90
     $write("%8d : %x %x[%x] %x %x %x | MeWb_rd2 %d %d | ExMe_rd2 %d [w_rrs %d w_rrt %d w_rrt2 %d]|ExMe_rslt %d MeWb_rslt %d\n",
        r_cnt, p.r_pc, p.IfId_pc, p.w_op, p.IdEx_pc, p.ExMe_pc, p.MeWb_pc,
        p.MeWb_rd2, p.w_rslt2, p.ExMe_rd2, p.w_rrs,p.w_rrt, p.w_rrt2,p.ExMe_rslt, p.MeWb_rslt);
+  end
+
+  initial begin
+    $dumpfile("code140.vcd");
+    $dumpvars(0, p);
   end
 endmodule
 
@@ -63,17 +68,18 @@ module m_proc11 (w_clk, w_rst, r_rout, r_halt);
   output reg [31:0] r_rout;
   output reg        r_halt;
 
-  reg  [31:0] IfId_pc4=0;                                    // pipe regs
+  reg  [31:0] IfId_pc4=0, Idhalf_pc4=0;                      // pipe regs
+  reg  [31:0] Idhalf_imm32=0, Idhalf_sftl2=0;                // plus
   reg  [31:0] IdEx_rrs=0, IdEx_rrt=0, IdEx_rrt2=0;           //
-  reg   [5:0] IdEx_rs=0, IdEx_rt=0;                          //plus alpha for mux
+  reg   [5:0] Idhalf_rs=0,IdEx_rs=0, Idhalf_rt=0, IdEx_rt=0; //plus alpha for mux
   reg  [31:0] ExMe_rslt=0, ExMe_rrt=0;                       //
   reg  [31:0] MeWb_rslt=0;                                   //
-  reg   [5:0]             IdEx_op=0,  ExMe_op=0,  MeWb_op=0; //
-  reg  [31:0] IfId_pc=0,  IdEx_pc=0,  ExMe_pc=0,  MeWb_pc=0; //
-  reg   [4:0] IfId_rd2=0, IdEx_rd2=0, ExMe_rd2=0, MeWb_rd2=0;//
-  reg         IfId_w=0,   IdEx_w=0,   ExMe_w=0,   MeWb_w=0;  //
-  reg         IfId_we=0,  IdEx_we=0,  ExMe_we=0;             //
-  wire [31:0] IfId_ir, MeWb_ldd;                             // note
+  reg   [5:0]             Idhalf_op=0, IdEx_op=0,  ExMe_op=0,  MeWb_op=0; //
+  reg  [31:0] Idhalf_pc=0, IfId_pc=0,  IdEx_pc=0,  ExMe_pc=0,  MeWb_pc=0; //
+  reg   [4:0] Idhalf_rd2=0, IfId_rd2=0, IdEx_rd2=0, ExMe_rd2=0, MeWb_rd2=0;//
+  reg         Idhalf_w=0, IfId_w=0,   IdEx_w=0,   ExMe_w=0,   MeWb_w=0;  //
+  reg         Idhalf_we=0, IfId_we=0,  IdEx_we=0,  ExMe_we=0;             //
+  wire [31:0] IfId_ir, IfId_ir2, MeWb_ldd;                             // note
   /**************************** IF stage **********************************/
   wire w_taken;
   wire [31:0] w_tpc;
@@ -85,31 +91,50 @@ module m_proc11 (w_clk, w_rst, r_rout, r_halt);
     IfId_pc  <= #3 r_pc;
     IfId_pc4 <= #3 w_pc4;
   end
-  /**************************** ID stage ***********************************/
-  wire [31:0] w_rrs, w_rrt, w_rslt2;
-  wire  [5:0] w_op    = IfId_ir[31:26];
-  wire  [4:0] w_rs    = IfId_ir[25:21];
-  wire  [4:0] w_rt    = IfId_ir[20:16];
-  wire  [4:0] w_rd    = IfId_ir[15:11];
+  /**************************** ID1 stage ***********************************/
+  wire [31:0] w_rrs = 0, w_rrt = 0;
+  wire [31:0] w_rslt2;
+  wire  [5:0] w_op    = IfId_ir2[31:26];
+  wire  [4:0] w_rs    = IfId_ir2[25:21];
+  wire  [4:0] w_rt    = IfId_ir2[20:16];
+  wire  [4:0] w_rd    = IfId_ir2[15:11];
   wire  [4:0] w_rd2   = (w_op!=0) ? w_rt : w_rd;
-  wire [15:0] w_imm   = IfId_ir[15:0];
+  wire [15:0] w_imm   = IfId_ir2[15:0];
   wire [31:0] w_imm32 = {{16{w_imm[15]}}, w_imm};
-  wire [31:0] w_rrt2  = (w_op>6'h5) ? w_imm32 : w_rrt;
-  assign      w_tpc   = IfId_pc4 + {w_imm32[29:0], 2'h0};
-  assign      w_taken = (w_op==`BNE && w_rrs!=w_rrt) ||(w_op==`BEQ && w_rrs==w_rrt);
+  assign IfId_ir2 = (w_taken) ? `NOP : IfId_ir;
   m_regfile m_regs (w_clk, w_rs, w_rt, MeWb_rd2, MeWb_w, w_rslt2, w_rrs, w_rrt);
+  always @(posedge w_clk) begin
+    Idhalf_sftl2 <= #3 {w_imm32[29:0], 2'h0};
+    Idhalf_imm32 <= #3 {{16{w_imm[15]}}, w_imm};
+
+    Idhalf_pc   <= #3 IfId_pc;
+    Idhalf_pc4  <= #3 IfId_pc4;
+    Idhalf_op   <= #3 w_op;
+    Idhalf_rd2  <= #3 w_rd2;
+    Idhalf_w    <= #3 (w_op==0 || (w_op>6'h5 && w_op<6'h28));
+    Idhalf_we   <= #3 (w_op>6'h27);
+    Idhalf_rs   <= #3 w_rs;//tasita
+    Idhalf_rt   <= #3 (w_op==0) ? w_rt : 0;//tasita zisinnnai
+  end
+
+
+  /**************************** ID2 stage ***********************************/
+  wire [31:0] w_rrt2  = (Idhalf_op>6'h5) ? Idhalf_imm32 : w_rrt;
+  assign      w_tpc   = Idhalf_pc4 + Idhalf_sftl2;
+  assign      w_taken = (Idhalf_op==`BNE && w_rrs!=w_rrt) ||(Idhalf_op==`BEQ && w_rrs==w_rrt);
+
 
   always @(posedge w_clk) begin
-    IdEx_pc   <= #3 IfId_pc;
-    IdEx_op   <= #3 w_op;
-    IdEx_rd2  <= #3 w_rd2;
-    IdEx_w    <= #3 (w_op==0 || (w_op>6'h5 && w_op<6'h28));
-    IdEx_we   <= #3 (w_op>6'h27);
+    IdEx_pc   <= #3 Idhalf_pc;
+    IdEx_op   <= #3 Idhalf_op;
+    IdEx_rd2  <= #3 Idhalf_rd2;
+    IdEx_w    <= #3 Idhalf_w;
+    IdEx_we   <= #3 Idhalf_we;
     IdEx_rrs  <= #3 w_rrs;
     IdEx_rrt  <= #3 w_rrt;
     IdEx_rrt2 <= #3 w_rrt2;
-    IdEx_rs   <= #3 w_rs;//tasita
-    IdEx_rt   <= #3 (w_op==0) ? w_rt : 0;//tasita zisinnnai
+    IdEx_rs   <= #3 Idhalf_rs;
+    IdEx_rt   <= #3 Idhalf_rt;
   end
   /**************************** EX stage ***********************************/
   //mux for data hazard
@@ -258,19 +283,19 @@ module m_memory (w_clk, w_addr, w_we, w_din, r_dout);
 endmodule
 
 /******************************************************************************/
-module m_regfile (w_clk, w_rr1, w_rr2, w_wr, w_we, w_wdata, w_rdata1, w_rdata2);
+module m_regfile (w_clk, w_rr1, w_rr2, w_wr, w_we, w_wdata, r_rdata1, r_rdata2);
   input  wire        w_clk;
   input  wire  [4:0] w_rr1, w_rr2, w_wr;
   input  wire [31:0] w_wdata;
   input  wire        w_we;
-  output wire [31:0] w_rdata1, w_rdata2;
+  output reg [31:0] r_rdata1=0, r_rdata2=0;//initial
 
   reg [31:0] r[0:31];
-  assign #15 w_rdata1 = (w_rr1==0) ? 0 :
-   (w_we && (w_rr1==w_wr)) ? w_wdata :r[w_rr1];
-  assign #15 w_rdata2 = (w_rr2==0) ? 0 :
-   (w_we && (w_rr2==w_wr)) ? w_wdata : r[w_rr2];
-  always @(posedge w_clk) if(w_we) r[w_wr] <= w_wdata;
+  always @(posedge w_clk) begin
+    if(w_we) r[w_wr] <= w_wdata;
+    r_rdata1 = (w_rr1==0) ? 0 : (w_we && (w_rr1==w_wr)) ? w_wdata : r[w_rr1];
+    r_rdata2 = (w_rr2==0) ? 0 : (w_we && (w_rr2==w_wr)) ? w_wdata : r[w_rr2];
+  end
 
   initial begin
     r[1] = 1;
