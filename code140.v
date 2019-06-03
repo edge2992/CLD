@@ -31,6 +31,10 @@ module m_top ();
        r_cnt, p.r_pc, p.IfId_pc, p.w_op, p.IdEx_pc, p.ExMe_pc, p.MeWb_pc,
        p.MeWb_rd2, p.w_rslt2, p.ExMe_rd2, p.w_rrs,p.w_rrt, p.w_rrt2,p.ExMe_rslt, p.MeWb_rslt);
   end
+  initial begin
+    $dumpfile("code140.vcd");
+    $dumpvars(0, p);
+  end
 endmodule
 
 /******************************************************************************/
