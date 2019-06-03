@@ -23,7 +23,7 @@ module m_top ();
   wire [31:0] w_rout;
   m_proc11 p (r_clk, r_rst, w_rout, w_halt);
   always@(posedge r_clk) if (w_halt) $finish;
-  //always@(posedge r_clk) if (r_cnt>=100) $finish;//デバック用
+  always@(posedge r_clk) if (r_cnt>=100) $finish;//デバック用
   reg [31:0] r_cnt = 0;
   always@(posedge r_clk) r_cnt <= r_cnt + 1;
   always@(posedge r_clk) begin #90
