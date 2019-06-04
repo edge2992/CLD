@@ -124,9 +124,9 @@ module m_proc11 (w_clk, w_rst, r_rout, r_halt);
   assign w_plus2_1 = ((IdEx_rt == ExMe_rd2) && (ExMe_rd2 != 0) && ExMe_w) ? ExMe_rslt :
   ((MeWb_rd2 != 0) && (IdEx_rt == MeWb_rd2)&& MeWb_w) ? w_rslt2 : IdEx_rrt2;//mux
 
-  assign w_plus2_2 = (ExMe_op > 6'h5) ? IdEx_rrt2 : w_plus2_1;
+  //assign w_plus2_2 = (ExMe_op > 6'h5) ? IdEx_rrt2 : w_plus2_1;
 
-  wire [31:0] #10 w_rslt = w_plus1 + w_plus2_2; // ALU origin
+  wire [31:0] #10 w_rslt = w_plus1 + w_plus2_1; // ALU origin
 
   always @(posedge w_clk) begin
     ExMe_pc   <= #3 IdEx_pc;
