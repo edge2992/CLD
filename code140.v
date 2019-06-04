@@ -16,7 +16,7 @@
 /******************************************************************************/
 
 module m_top ();
-  reg r_clk=0; initial forever #50 r_clk = ~r_clk;
+  reg r_clk=0; initial forever #100 r_clk = ~r_clk;
   reg r_rst=0;
 
   wire w_halt;
@@ -305,14 +305,12 @@ module m_regfile (w_clk, w_rr1, w_rr2, w_wr, w_we, w_wdata, r_rdata1, r_rdata2);
   input  wire [31:0] w_wdata;
   input  wire        w_we;
   output reg [31:0] r_rdata1, r_rdata2;//initial
-  reg [4:0] r_rr1=0, r_rr2=0;
-  
+  //reg [4:0] r_rr1=0, r_rr2=0;
+
   reg [31:0] r[0:31];
   always @(posedge w_clk) begin
-    r_rr1 <= w_rr1;
-    r_rr2 <= w_rr2;
-    r_rdata1 <= #15 (r_rr1==0) ? 0 : (w_we && (r_rr1==w_wr)) ? w_wdata : r[r_rr1];
-    r_rdata2 <= #15 (r_rr2==0) ? 0 : (w_we && (r_rr2==w_wr)) ? w_wdata : r[r_rr2];
+    r_rdata1 <= #15 (w_rr1==0) ? 0 : (w_we && (w_rr1==w_wr)) ? w_wdata : r[w_rr1];
+    r_rdata2 <= #15 (w_rr2==0) ? 0 : (w_we && (w_rr2==w_wr)) ? w_wdata : r[w_rr2];
     if(w_we) r[w_wr] <= w_wdata;
   end
 
