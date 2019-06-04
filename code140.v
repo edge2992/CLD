@@ -23,7 +23,7 @@ module m_top ();
   wire [31:0] w_rout;
   m_proc11 p (r_clk, r_rst, w_rout, w_halt);
   always@(posedge r_clk) if (w_halt) $finish;
-  always@(posedge r_clk) if (r_cnt>=100) $finish;//デバック用
+  //always@(posedge r_clk) if (r_cnt>=100) $finish;//デバック用
   reg [31:0] r_cnt = 0;
   always@(posedge r_clk) r_cnt <= r_cnt + 1;
   always@(posedge r_clk) begin #90
@@ -153,7 +153,7 @@ module m_proc11 (w_clk, w_rst, r_rout, r_halt);
   always @(posedge w_clk) if (MeWb_op==`HALT) r_halt <= 1;
   initial r_rout = 0;
   reg [31:0] r_tmp=0;
-  always @(posedge w_clk) r_tmp <= (w_rst) ? 0 : (w_rs==30) ? w_rrs : r_tmp;
+  always @(posedge w_clk) r_tmp <= (w_rst) ? 0 : (IdEx_rs==30) ? w_plus1 : r_tmp;
   always @(posedge w_clk) r_rout <= r_tmp;
 endmodule
 
