@@ -104,7 +104,10 @@ module m_proc11 (w_clk, w_rst, r_rout, r_halt);
   wire [31:0] w_imm32 = {{16{w_imm[15]}}, w_imm};
   assign IfId_ir2 = (IdEx_taken) ? `NOP : IfId_ir;
   m_regfile m_regs (w_clk, w_rs, w_rt, MeWb_rd2, MeWb_w, w_rslt2, w_rrs, w_rrt);
+  reg [31:0] r_check1=0, r_check2=0;
   always @(posedge w_clk) begin
+    r_check1 <= #15 w_rrs;
+    r_check2 <= #15 w_rrt;
     Idhalf_sftl2 <= #3 {w_imm32[29:0], 2'h0};
     Idhalf_imm32 <= #3 {{16{w_imm[15]}}, w_imm};
     Idhalf_pc   <= #3 IfId_pc;
@@ -301,18 +304,20 @@ module m_regfile (w_clk, w_rr1, w_rr2, w_wr, w_we, w_wdata, r_rdata1, r_rdata2);
   input  wire  [4:0] w_rr1, w_rr2, w_wr;
   input  wire [31:0] w_wdata;
   input  wire        w_we;
-  output reg [31:0] r_rdata1=0, r_rdata2=0;//initial
+  output reg [31:0] r_rdata1, r_rdata2;//initial
 
   reg [31:0] r[0:31];
   always @(posedge w_clk) begin
-    r_rdata1 = (w_rr1==0) ? 0 : (w_we && (w_rr1==w_wr)) ? w_wdata : r[w_rr1];
-    r_rdata2 = (w_rr2==0) ? 0 : (w_we && (w_rr2==w_wr)) ? w_wdata : r[w_rr2];
+    r_rdata1 <= #15 (w_rr1==0) ? 0 : (w_we && (w_rr1==w_wr)) ? w_wdata : r[w_rr1];
+    r_rdata2 <= #15 (w_rr2==0) ? 0 : (w_we && (w_rr2==w_wr)) ? w_wdata : r[w_rr2];
     if(w_we) r[w_wr] <= w_wdata;
   end
 
   initial begin
     r[1] = 1;
     r[2] = 2;
+    r_rdata1=0;
+    r_rdata2=0;
   end
 endmodule
 
