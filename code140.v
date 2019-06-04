@@ -14,7 +14,7 @@
 `define BNE  6'h5
 `define HALT 6'h11 /* this is not for MIPS */
 /******************************************************************************/
-/*
+
 module m_top ();
   reg r_clk=0; initial forever #50 r_clk = ~r_clk;
   reg r_rst=0;
@@ -27,13 +27,16 @@ module m_top ();
   reg [31:0] r_cnt = 0;
   always@(posedge r_clk) r_cnt <= r_cnt + 1;
   always@(posedge r_clk) begin #90
-    $write("%8d : %x %x[%x] %x %x %x | MeWb_rd2 %d %d | ExMe_rd2 %d [w_rrs %d w_rrt %d w_rrt2 %d]|ExMe_rslt %d MeWb_rslt %d\n",
-       r_cnt, p.r_pc, p.IfId_pc, p.w_op, p.IdEx_pc, p.ExMe_pc, p.MeWb_pc,
-       p.MeWb_rd2, p.w_rslt2, p.ExMe_rd2, p.w_rrs,p.w_rrt, p.w_rrt2,p.ExMe_rslt, p.MeWb_rslt);
+  if (r_cnt>=991300)begin
+    $write("%8d : %x| MeWb_rd2 %d %d | ExMe_rd2 %d [w_rrs %d w_rrt %d w_rrt2 %d]|ExMe_rslt %d MeWb_rslt %d| r_tmp %x r_rout %x\n",
+       r_cnt, p.r_pc,
+       p.MeWb_rd2, p.w_rslt2, p.ExMe_rd2, p.w_rrs,p.w_rrt, p.w_rrt2,p.ExMe_rslt, p.MeWb_rslt,p.r_tmp,p.r_rout);
+  end
   end
 endmodule
-*/
+
 /******************************************************************************/
+/*
 module m_main (w_clk, w_btnu, w_btnd, w_led, r_sg, r_an);
   input  wire w_clk, w_btnu, w_btnd;
   output wire [15:0] w_led;
@@ -60,6 +63,7 @@ module m_main (w_clk, w_btnu, w_btnd, w_led, r_sg, r_an);
   always @(posedge w_clk2) r_sg <= w_sg;
   always @(posedge w_clk2) r_an <= w_an;
 endmodule
+*/
 /******************************************************************************/
 module m_proc11 (w_clk, w_rst, r_rout, r_halt);
   input  wire w_clk, w_rst;
@@ -100,9 +104,11 @@ module m_proc11 (w_clk, w_rst, r_rout, r_halt);
   wire [31:0] w_rrt2  = (w_op>6'h5) ? w_imm32 : w_rrt;
   assign      w_tpc   = IfId_pc4 + {w_imm32[29:0], 2'h0};
   assign      w_taken = (w_op==`BNE && w_rrs!=w_rrt) ||(w_op==`BEQ && w_rrs==w_rrt);
+
   m_regfile m_regs (w_clk, w_rs, w_rt, MeWb_rd2, MeWb_w, w_rslt2, w_rrst, w_rrt);
 
-  assign w_rrs = (w_rs == 30) ? IdEx_rrs : w_rrst;
+  assign w_rrs = (w_rs == 30) ? w_rslt : w_rrst;//w_rs==30の時のw＿rsltからのフォワーディング
+
   always @(posedge w_clk) begin
     IdEx_pc   <= #3 IfId_pc;
     IdEx_op   <= #3 w_op;
